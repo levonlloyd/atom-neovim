@@ -5,7 +5,7 @@
   "description": "Make Atom your GUI to Neovim.",
   "license": "MIT",
   "private": true,
-  "repository": "https://github.com/carlosdcastillo/vim-mode",
+  "repository": "https://github.com/levonlloyd/atom-neovim",
   "engines": {
     "atom": ">0.174.0"
   },
