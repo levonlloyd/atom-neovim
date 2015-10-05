@@ -27,7 +27,6 @@ neovim_set_text = (text, start, end, delta) ->
   cpos = VimGlobals.current_editor.getCursorScreenPosition()
   neovim_send_message(['vim_get_current_buffer',[]],
     ((buf) ->
-      #console.log 'buff',buf
       neovim_send_message(['buffer_line_count',[buf]],
         ((vim_cnt) ->
           neovim_send_message(['buffer_get_line_slice', [buf, 0,
