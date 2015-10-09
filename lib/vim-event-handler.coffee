@@ -17,6 +17,7 @@ class EventHandler
     @rows = Math.floor((qbottom - qtop)/lineSpacing()+1)
     height = Math.floor(50+(@rows-0.5) * lineSpacing())
 
+    # This seems wrong
     atom.setWindowDimensions ('width': 1400, 'height': height)
     @cols = 100
     @command_mode = true
@@ -165,6 +166,7 @@ class EventHandler
 
   # TODO(levon): this needs some love.  refactoring, re-naming
   handleEvent: (event, q) =>
+    debugger
     if q.length is 0
       return
     if VimGlobals.updating

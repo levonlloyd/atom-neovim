@@ -3,12 +3,11 @@ root = exports ? this
 unless root.lupdates
   root.lupdates = []
 
-unless root.session
-  root.session = undefined
-
+# this probably belongs as vim-state field
 unless root.current_editor
   root.current_editor = undefined
 
+# this probably belongs as vim-state field
 unless root.tlnumber
   root.tlnumber = 0
 
