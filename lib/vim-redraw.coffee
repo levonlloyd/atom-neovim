@@ -7,7 +7,7 @@ module.exports =
 class VimRedraw
   session: null
 
-  constructor: (@session) ->
+  constructor: (@remoteVim) ->
 
   # This is directly called by timer and makes sure of a bunch of housekeeping
   #functions like, marking the buffer modified, working around some Neovim for
@@ -24,7 +24,7 @@ class VimRedraw
     @setModifiedOnTabBar(uri)
 
     if not VimGlobals.updating and not VimGlobals.internal_change
-      @session.sendMessage(['vim_eval',["expand('%:p')"]], (filename) ->
+      @remoteVim.getCurrentFilename().then (filename) ->
         filename = filename.binarySlice()
 
         ncefn =  VimUtils.normalize_filename(uri)
@@ -35,22 +35,11 @@ class VimRedraw
           atom.workspace.open(filename)
         else
           @syncLines()
-      )
 
     if not VimGlobals.internal_change
       if editor_views[VimGlobals.current_editor.getURI()].classList.contains('is-focused')
-        pos = event.newBufferPosition
-        r = pos.row + 1
-        c = pos.column + 1
-        sel = VimGlobals.current_editor.getSelectedBufferRange()
-        #console.log 'sel:',sel
-        @session.sendMessage(['vim_command',['cal cursor('+r+','+c+')']],
-          (() ->
-            if not sel.isEmpty()
-              VimGlobals.current_editor.setSelectedBufferRange(sel,
-                  sel.end.isLessThan(sel.start))
-          )
-        )
+        @remoteVim.moveCursorWithSelection(
+          pos.row, pos.column, VimGlobals.current_editor)
 
     # deleting temp files maybe?
     active_change = false
@@ -69,8 +58,8 @@ class VimRedraw
 
     if VimGlobals.current_editor
       VimGlobals.internal_change = true
-      @session.sendMessage(['vim_eval',["line('$')"]], (nLines) ->
 
+      @remoteVim.getCurrentBufferLineCount().then (nLines) ->
         if VimGlobals.current_editor.buffer.getLastRow() < parseInt(nLines)
           nl = parseInt(nLines) - VimGlobals.current_editor.buffer.getLastRow()
           diff = ''
@@ -79,12 +68,10 @@ class VimRedraw
           append_options = {normalizeLineEndings: true}
           VimGlobals.current_editor.buffer.append(diff, append_options)
 
-          @session.sendMessage(['vim_command',['redraw!']],
-            (() ->
+          @remoteVim.redraw().then ->
               VimGlobals.internal_change = false
-            )
-          )
-        else if VimGlobals.current_editor.buffer.getLastRow() > parseInt(nLines)
+
+        else if VimGlobals.current_editor.buffer.getLastRow() > nLines
           for i in [parseInt(nLines)..VimGlobals.current_editor.buffer.getLastRow()-1]
             VimGlobals.current_editor.buffer.deleteRow(i)
 
@@ -103,11 +90,9 @@ class VimRedraw
                     #new Point(pos,item.length)),'',options)
             #pos = pos + 1
 
-      )
-
   setModifiedOnTabBar: (uri) ->
     # determine the buffer was modified and indicate in the tab bar if it was
-    @session.sendMessage(['vim_eval',['&modified']], (mod) ->
+    @remoteVim.bufferHasBeenModified().then( (modified) ->
 
       q = '.tab-bar .tab [data-path*="'
       q = q.concat(uri)
@@ -117,7 +102,7 @@ class VimRedraw
       if tabelement
         tabelement = tabelement.parentNode
         if tabelement
-          if parseInt(mod) == 1
+          if modified
             if not tabelement.classList.contains('modified')
               tabelement.classList.add('modified')
             tabelement.isModified = true

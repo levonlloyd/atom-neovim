@@ -1,4 +1,3 @@
-VimGlobals = require './vim-globals'
 KeymapManager = require('atom-keymap')
 
 translateCode = (code, shift, control) ->
@@ -32,7 +31,7 @@ class KeyObserver
   editorView: null
   counter: 0
 
-  constructor: (@editorView) ->
+  constructor: (@editorView, @remoteVim) ->
     # ultimately I think this should be document, not view.  We'll see
     # This should be global and direct key events to the appropriate buffer
     editorView.addEventListener('keydown', (event) =>
@@ -56,6 +55,7 @@ class KeyObserver
       event.stopPropagation()
       return
     event.stopPropagation()
+    @remoteVim.typeKey(q)
     @counter += 1
     #debugger
 
@@ -66,7 +66,7 @@ class KeyObserver
     if q1 and not q2 and not e.altKey
       translation = translateCode(e.which, e.shiftKey, e.ctrlKey)
       if translation != ""
-        VimGlobals.session.sendMessage(['vim_input',[translation]])
+        @remoteVim.typeKey(translation)
         false
     else
       true
@@ -77,7 +77,6 @@ class KeyObserver
     q2 = @editorView.classList.contains('autocomplete-active')
     if q1 and not q2
       q =  String.fromCharCode(e.which)
-      VimGlobals.session.sendMessage(['vim_input',[q]])
       false
     else
       true

@@ -56,27 +56,28 @@ class NeoVimSession
     @session = deferred.promise
 
   subscribe: (eventHandler) ->
-    return unless @session #TODO(levon): use futures/promises so that this will happen when there is a session
-    @session.then (s) =>
+    @session.then (s) ->
       s.on('notification', eventHandler.handleEvent)
 
-  sendMessage: (message,f = undefined) ->
+  sendMessage: (message) ->
 
     # TODO(levon): is the try catch necessary?  seems not
     # TODO(levon): return a future instead of taking a function
     try
       if message[0] and message[1]
         console.log("MESSAGE 1: " + message[0])
-        console.log("MESSAGE 2: " + message[1])
+        console.log(message[1])
+        deferred = Q.defer()
         @session.then (s) ->
           s.request(message[0], message[1], (err, res) ->
-            if f
-              console.log("RES: " + res)
-              if typeof(res) is 'number'
-                f(util.inspect(res))
-              else
-                f(res)
+            console.log("RES: " + res)
+            console.log(err)
+            if typeof(res) is 'number'
+              deferred.resolve(util.inspect(res))
+            else
+              deferred.resolve(res)
           )
+          return deferred.promise
     catch err
       console.log 'error in neovim_send_message '+err
       console.log 'm1:',message[0]

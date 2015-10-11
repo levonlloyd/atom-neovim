@@ -11,12 +11,14 @@ class VimPaneChanger
   scrollTop: null
   disposables: null
 
-  constructor: (@session) ->
-    @disposables.add atom.workspace.onDidDestroyPaneItem @destroyPaneItem
-    @disposables.add atom.workspace.onDidChangeActivePaneItem @activePaneChanged
+  constructor: (@remoteVim) ->
+    @disposables = new CompositeDisposable()
+    @disposables.add atom.workspace.onDidDestroyPaneItem =>
+      @destroyPaneItem()
+    @disposables.add atom.workspace.onDidChangeActivePaneItem =>
+      @activePaneChanged()
 
   activePaneChanged: () ->
-    debugger
     return if VimGlobals.updating
 
     VimGlobals.updating = true
@@ -27,8 +29,10 @@ class VimPaneChanger
       VimGlobals.current_editor = atom.workspace.getActiveTextEditor()
       return unless VimGlobals.current_editor
       filename = atom.workspace.getActiveTextEditor().getURI()
+      debugger
       # load the file that atom is looking at in neovim
-      @session.sendMessage(['vim_command',['e! '+ filename]],(x) =>
+      @remoteVim.openFile(filename).then =>
+        debugger
         # update subscriptions
         if @scrollTopChangeSubscription
           @scrollTopChangeSubscription.dispose()
@@ -60,7 +64,7 @@ class VimPaneChanger
         tlnumber = 0
         # TODO(levon): put this back when vimstat is transitioned
         #editor_views[VimGlobals.current_editor.getURI()].vimState.afterOpen()
-      )
+
     catch err
       console.log err
       console.log 'problem changing panes'
@@ -105,17 +109,8 @@ class VimPaneChanger
     if not VimGlobals.internal_change
       if editor_views[VimGlobals.current_editor.getURI()].classList.contains('is-focused')
         pos = event.newBufferPosition
-        r = pos.row + 1
-        c = pos.column + 1
-        sel = VimGlobals.current_editor.getSelectedBufferRange()
         #console.log 'sel:',sel
-        @session.sendMessage(['vim_command',['cal cursor('+r+','+c+')']],
-          (() ->
-            if not sel.isEmpty()
-              VimGlobals.current_editor.setSelectedBufferRange(sel,
-                  sel.end.isLessThan(sel.start))
-          )
-        )
+        @remoteVim.moveCursorWithSelection(pos.row, pos.column, VimGlobals.current_editor)
 
   scrollTopChanged: () ->
     if not VimGlobals.internal_change
@@ -123,22 +118,17 @@ class VimPaneChanger
         if @scrollTop
           diff = scrolltop - VimGlobals.current_editor.getScrollTop()
           if  diff > 0
-            @session.sendMessage(['vim_input',['<ScrollWheelUp>']])
+            @remoteVim.scrollUp()
           else
-            @session.sendMessage(['vim_input',['<ScrollWheelDown>']])
+            @remoteVim.scrollDown()
       else
         sels = VimGlobals.current_editor.getSelectedBufferRanges()
         for sel in sels
-          r = sel.start.row + 1
-          c = sel.start.column + 1
           #console.log 'sel:',sel
-          @session.sendMessage(['vim_command',['cal cursor('+r+','+c+')']],
-            (() ->
+          @remoteVim.moveCursor(sel.start.row, sel.start.column).then ->
               if not sel.isEmpty()
                 VimGlobals.current_editor.setSelectedBufferRange(sel,
                     sel.end.isLessThan(sel.start))
-            )
-          )
 
     @scrollTop = VimGlobals.current_editor.getScrollTop()
 
@@ -147,27 +137,22 @@ class VimPaneChanger
       console.log 'destroying pane, will send command:', event.item
       console.log 'b:', event.item.getURI()
       uri =event.item.getURI()
-      @session.sendMessage(['vim_eval',["expand('%:p')"]],
-        ((filename) ->
-          filename = filename.binarySlice()
-          console.log 'filename reported by vim:',filename
-          console.log 'current editor uri:',uri
-          ncefn =  VimUtils.normalize_filename(uri)
-          nfn =  VimUtils.normalize_filename(filename)
+      @remoteVim.getCurrentFilename.then (filename) =>
+        filename = filename.binarySlice()
+        console.log 'filename reported by vim:',filename
+        console.log 'current editor uri:',uri
+        ncefn =  VimUtils.normalize_filename(uri)
+        nfn =  VimUtils.normalize_filename(filename)
 
-          if ncefn and nfn and nfn isnt ncefn
-            console.log '-------------------------------',nfn
-            console.log '*******************************',ncefn
+        if ncefn and nfn and nfn isnt ncefn
+          console.log '-------------------------------',nfn
+          console.log '*******************************',ncefn
 
-            @session.sendMessage(['vim_command',['e! '+ncefn]],
-              (() ->
-                @session.sendMessage(['vim_command',['bd!']])
-              )
-            )
-          else
-            @session.sendMessage(['vim_command',['bd!']])
-        )
-      )
+          @remoteVim.openFile(ncefn).then ->
+            @remoteVim.closeBuffer()
+        else
+          @remoteVim.closeBuffer()
+
       console.log 'destroyed pane'
   destroy: ->
     @disposables.dispose()

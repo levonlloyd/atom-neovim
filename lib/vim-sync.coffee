@@ -7,56 +7,38 @@ VimUtils = require './vim-utils'
 #There is a bunch of bookkeeping to make sure the change is unidirectional.
 
 neovim_set_text = (text, start, end, delta) ->
-  debugger
   lines = text.split('\n')
   lines = lines[0..lines.length-2]
   cpos = VimGlobals.current_editor.getCursorScreenPosition()
   # The following three send calls collectively get the entire buffer from vim.
   # gets the name of the current buffer
-  VimGlobals.session.sendMessage(['vim_get_current_buffer',[]],
-    ((buf) ->
-      # gets the number of lines in the current buffer
-      VimGlobals.session.sendMessage(['buffer_line_count',[buf]],
-        ((vim_cnt) ->
+  @vimState.getAllLinesForCurrentBuffer().then (vim_lines_r) ->
+    vim_lines = []
+    for line in vim_lines_r
+      vim_lines.push line.binarySlice()
+    l = []
+    pos = 0
+    for pos in [0..vim_lines.length + delta - 1]
+      item = vim_lines[pos]
+      if pos < start
+        if item
+          l.push(item)
+        else
+          l.push('')
 
-          # gets all the data for the buffer from vim as an array of lines
-          VimGlobals.session.sendMessage(['buffer_get_line_slice', [buf, 0,
-                                                          parseInt(vim_cnt),
-                                                          true,
-                                                          false]],
-            ((vim_lines_r) ->
-              vim_lines = []
-              for line in vim_lines_r
-                vim_lines.push line.binarySlice()
-              l = []
-              pos = 0
-              for pos in [0..vim_lines.length + delta - 1]
-                item = vim_lines[pos]
-                if pos < start
-                  if item
-                    l.push(item)
-                  else
-                    l.push('')
+      if pos >= start and pos <= end + delta
+        if lines[pos]
+          l.push(lines[pos])
+        else
+          l.push('')
 
-                if pos >= start and pos <= end + delta
-                  if lines[pos]
-                    l.push(lines[pos])
-                  else
-                    l.push('')
+      if pos > end + delta
+        if vim_lines[pos-delta]
+          l.push(vim_lines[pos-delta])
+        else
+          l.push('')
 
-                if pos > end + delta
-                  if vim_lines[pos-delta]
-                    l.push(vim_lines[pos-delta])
-                  else
-                    l.push('')
-
-              send_data(buf,l,delta,-delta, cpos.row+1, cpos.column+1)
-            )
-          )
-        )
-      )
-    )
-  )
+    send_data(buf,l,delta,-delta, cpos.row, cpos.column)
 
 #This function sends the data and updates the the cursor location. It then
 #calls a function to update the state to the syncing from Atom -> Neovim
@@ -72,13 +54,13 @@ send_data = (buf, l, delta, i, r, c) ->
     l2.push '"'+item2+'"'
 
   lines.push('cal setline(1, ['+l2.join()+'])')
-  lines.push('redraw!')
+  @remoteVim.setLines(l, 1).then(@remoteVim.redraw)
 
+  # Not sure what to do here
   while j > l.length
     lines.push(''+(j)+'d')
     j = j - 1
-  lines.push('cal cursor('+r+','+c+')')
-  console.log 'lines2',lines
+  @remoteVim.moveCursor(r, c)
   VimGlobals.internal_change = true
   VimGlobals.session.sendMessage(['vim_command', [lines.join(' | ')]],
                       update_state)
@@ -89,11 +71,8 @@ send_data = (buf, l, delta, i, r, c) ->
 update_state = () ->
   VimGlobals.updating = false
   VimGlobals.internal_change = true
-  VimGlobals.session.sendMessage(['vim_command',['redraw!']],
-    (() ->
+  @remoteVim.redraw().then ->
       VimGlobals.internal_change = false
-    )
-  )
 
 module.exports =
 

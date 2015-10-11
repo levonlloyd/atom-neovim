@@ -14,8 +14,6 @@ KeyObserver = require './vim-key-observer'
 
 DEBUG = false
 
-subscriptions = {}
-subscriptions['redraw'] = false
 screen_f = []
 # These need to be accessible from event handler
 screen = []  # currently visible screen I think 
@@ -43,7 +41,6 @@ class VimState
     editor_views[@editor.getURI()] = @editorView
     @editorView.component.setInputEnabled(false)
     @mode = 'command'
-    @cursor_visible = true
     @scrolled_down = false # which direction the scroll is
     VimGlobals.tlnumber = 0
     @status_bar = [] # things to go in the status bar
@@ -54,6 +51,7 @@ class VimState
     @changeModeClass('command-mode')
     @activateCommandMode()
 
+    # TODO(levon) figure out how this works!!
     atom.packages.onDidActivatePackage(  ->
       element.innerHTML = ''
       @statusbar =
@@ -63,10 +61,6 @@ class VimState
 
     @keyObserver = new KeyObserver(@editorView)
     @afterOpen()
-
-  afterOpen: =>
-    if not subscriptions['redraw']
-      @neovim_subscribe()
 
   postprocess: (rows, dirty) ->
     screen_f = []
@@ -142,46 +136,10 @@ class VimState
 
   # TODO(levon): move this to vim-mode as part of initialization
   neovim_subscribe: =>
-    eventHandler = new EventHandler this
-
-    message = ['ui_attach',[eventHandler.cols,eventHandler.rows,true]]
-    VimGlobals.session.sendMessage(message)
-
-    VimGlobals.session.subscribe(eventHandler)
     #rows = @editor.getScreenLineCount()
     @location = [0,0]
     @status_bar = (' ' for ux in [1..eventHandler.cols])
     screen = ((' ' for ux in [1..eventHandler.cols])  for uy in [1..eventHandler.rows-1])
-
-    subscriptions['redraw'] = true
-
-  #Used to enable command mode.
-  activateCommandMode: ->
-    @mode = 'command'
-    @changeModeClass('command-mode')
-    @updateStatusBar()
-
-  #Used to enable insert mode.
-  activateInsertMode: (transactionStarted = false)->
-    @mode = 'insert'
-    @changeModeClass('insert-mode')
-    @updateStatusBar()
-
-  activateInvisibleMode: (transactionStarted = false)->
-    @mode = 'insert'
-    @changeModeClass('invisible-mode')
-    @updateStatusBar()
-
-  changeModeClass: (targetMode) ->
-    if VimGlobals.current_editor
-      editorview = editor_views[VimGlobals.current_editor.getURI()]
-      if editorview
-        for mode in ['command-mode', 'insert-mode', 'visual-mode',
-                    'operator-pending-mode', 'invisible-mode']
-          if mode is targetMode
-            editorview.classList.add(mode)
-          else
-            editorview.classList.remove(mode)
 
   updateStatusBarWithText:(text, addcursor, loc) ->
     if addcursor
@@ -190,7 +148,4 @@ class VimState
     q = '<samp>'
     qend = '</samp>'
     element.innerHTML = q.concat(text).concat(qend)
-
-  updateStatusBar: ->
-    element.innerHTML = @mode
 

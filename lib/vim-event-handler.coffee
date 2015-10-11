@@ -10,15 +10,11 @@ lineSpacing = ->
 module.exports =
 #TODO(levon): test this :)
 class EventHandler
-  constructor: (@vimState) ->
-    qtop = VimGlobals.current_editor.getScrollTop()
-    qbottom = VimGlobals.current_editor.getScrollBottom()
+  constructor: (@editor) ->
+    qtop = @editor.getScrollTop()
+    qbottom = @editor.getScrollBottom()
 
     @rows = Math.floor((qbottom - qtop)/lineSpacing()+1)
-    height = Math.floor(50+(@rows-0.5) * lineSpacing())
-
-    # This seems wrong
-    atom.setWindowDimensions ('width': 1400, 'height': height)
     @cols = 100
     @command_mode = true
 
@@ -31,10 +27,9 @@ class EventHandler
   gotoCursor: (listOfLocations) ->
     for location in listOfLocations
       try
-        location[0] = util.inspect(location[0])
-        location[1] = util.inspect(location[1])
-        @vimState.location[0] = parseInt(location[0])
-        @vimState.location[1] = parseInt(location[1])
+        point = new Point(
+          util.inspect(location[0]), util.inspect(location[1]))
+        @editor.setCursorBufferPosition(point)
       catch
         console.log 'problem in goto'
 
@@ -152,17 +147,12 @@ class EventHandler
     @vimState.activateCommandMode()
     @command_mode = true
 
+  # maybe stay in normal mode if you are in normal mode
   turnCursorOn: ->
-    if @command_mode
-      @vimState.activateCommandMode()
-    else
-      @vimState.activateInsertMode()
-    @vimState.cursor_visible = true
+    @atomState.activateInsertMode()
 
   turnCursorOff: ->
     @vimState.activateInvisibleMode()
-    @vimState.cursor_visible = false
-
 
   # TODO(levon): this needs some love.  refactoring, re-naming
   handleEvent: (event, q) =>
@@ -196,7 +186,7 @@ class EventHandler
             #clear()
           when "eol_clear" then @eolClear()
 
-    @vimState.redraw_screen(@rows, dirty)
+    #@vimState.redraw_screen(@rows, dirty)
 
     # I'm not sure what happens down here
     if scrolled
