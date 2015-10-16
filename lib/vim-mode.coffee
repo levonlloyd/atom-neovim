@@ -7,6 +7,7 @@ VimRedraw = require './vim-redraw'
 RemoteVim = require './vim-remote-vim'
 VimPaneChanger = require './vim-pane-changer'
 EventHandler = require './vim-event-handler'
+AtomState = require './atom-state'
 
 # TODO(levon): remove these constants and generate them on startup
 if os.platform() is 'win32'
@@ -21,10 +22,9 @@ module.exports =
     @disposables = new CompositeDisposable
     session = new NeoVimSession(CONNECT_TO)
     message = ['ui_attach',[100,53,true]]
-    session.sendMessage(message).then ->
-      debugger
+    session.sendMessage(message).then
     remoteVim = new RemoteVim(session)
-    @paneChanger = new VimPaneChanger(remoteVim)
+    #@paneChanger = new VimPaneChanger(remoteVim)
 
     @disposables.add atom.workspace.observeTextEditors (editor) =>
 
@@ -34,9 +34,10 @@ module.exports =
       if editorView
         console.log 'view:',editorView
         editorView.classList.add('vim-mode')
-        @eventHandler = new EventHandler(editorView.getModel())
+        atomState = new AtomState()
+        @eventHandler = new EventHandler(editorView.getModel(), atomState)
         session.subscribe(@eventHandler)
-        #keyObserver =  new KeyObserver(editorView, remoteVim)
+        keyObserver =  new KeyObserver(editorView, remoteVim)
         #editorView.vimState = new VimState(editorView)
         #redrawer = new VimRedraw(session)
         #redrawer.redraw()

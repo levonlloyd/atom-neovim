@@ -13,7 +13,6 @@ class VimRedraw
   #functions like, marking the buffer modified, working around some Neovim for
   #Windows issues and invoking the code to sync the number of lines.
   redraw: ->
-    debugger
     VimGlobals.current_editor = atom.workspace.getActiveTextEditor()
     return unless VimGlobals.current_editor
 

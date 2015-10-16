@@ -29,10 +29,8 @@ class VimPaneChanger
       VimGlobals.current_editor = atom.workspace.getActiveTextEditor()
       return unless VimGlobals.current_editor
       filename = atom.workspace.getActiveTextEditor().getURI()
-      debugger
       # load the file that atom is looking at in neovim
       @remoteVim.openFile(filename).then =>
-        debugger
         # update subscriptions
         if @scrollTopChangeSubscription
           @scrollTopChangeSubscription.dispose()
